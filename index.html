@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ANIM MOVEMENT CLUB — 下北沢・地下のHYROX特化ジム</title>
+<meta name="description" content="下北沢/池ノ上・地下のHYROX特化ジム。2×10m人工芝でスレッド可。体験会・オープンジムをその場で予約。">
+<!--
+  ════════════════════════════════════════════════
+   運営マニュアル（Claude Codeへの編集はここを読む）
+  ════════════════════════════════════════════════
+  ページの中身（イベント日程・残席・料金・FAQ）は全て
+  一番下の <script> 内の CONFIG オブジェクト1か所で管理。
+  HTMLの本文は触らず、CONFIGを書き換えれば自動で反映される。
+
+  ★予約エンジンはSTORES予約。CONFIG.booking.url を入れると
+    全「予約」ボタンがSTORESに向き、空き状況もSTORES側で管理。
+    （URL未設定の間は各回の stripe リンクで動く）
+
+  よくある指示と対応：
+  ・「STORESに繋いで」          → CONFIG.booking.url に予約ページURL
+  ・「7/12を満席にして」        → その回の seatsLeft を 0 に（Stripe運用時のみ）
+  ・「7/12の残りを2席に」       → seatsLeft: 2
+  ・「体験会を1本増やして」      → CONFIG.events に1行足す
+  ・「クラスの時間を変えて」     → CONFIG.schedule を書き換える
+  ・「体験の値段を2500円に」     → その回の price を 2500 に
+  ・「Stripeリンクを差し替え」   → その回の stripe を実URLに
+  ・「FAQに〇〇を足して」        → CONFIG.faq に {q, a} を足す
+  ・「写真を足して」            → images/ に画像を置き CONFIG.gallery に1行
+  ・「地図を入れて」            → CONFIG.links.mapEmbed / googleMap を設定
+  ・「Instagram/Threadsを設定」 → CONFIG.links の各URLを差し替え
+  ・「月額会員プランを出して」   → CONFIG.membership に1行（stripeはサブスクリンク）
+  ・「PayPay QRを載せて」        → images/にQR画像、CONFIG.paypay.qr を設定
+
+  画像は images/ フォルダに置いて "images/名前.jpg" で参照する。
+
+  Stripeの決済リンクは、各回の在庫数=定員にしておくと
+  満席で自動的に売止めになる（予約DB不要）。
+-->
+<style>
+:root{
+  --black:#000000; --yellow:#F5C800; --white:#FFFFFF;
+  --surface:#111111; --elevated:#1A1A1A;
+  --border:#2A2A2A; --muted:#888888; --subtle:#444444;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--black); color:var(--white);
+  font-family:'Noto Sans JP',Arial,Helvetica,sans-serif;
+  font-size:15px; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:'JetBrains Mono',Menlo,monospace;}
+.wrap{max-width:680px;margin:0 auto;padding:0 20px;}
+section{padding:64px 0;}
+.tagline{height:3px;background:var(--yellow);border:0;width:48px;margin-bottom:24px;}
+.label{
+  font-size:11px;font-weight:700;letter-spacing:0.20em;
+  text-transform:uppercase;color:var(--yellow);margin-bottom:12px;
+}
+h2{font-size:32px;font-weight:700;letter-spacing:-0.02em;line-height:1.15;margin-bottom:32px;}
+.btn{
+  display:block;text-align:center;text-decoration:none;
+  font-size:13px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;
+  padding:16px 32px;transition:opacity 150ms ease-out;
+}
+.btn:hover{opacity:0.85;}
+.btn-primary{background:var(--yellow);color:var(--black);}
+.btn-secondary{background:var(--black);color:var(--white);border:1px solid var(--white);}
+
+/* NAV */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;height:56px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;background:rgba(0,0,0,0.92);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+}
+.nav-logo{font-size:16px;font-weight:700;letter-spacing:0.12em;color:var(--white);text-decoration:none;}
+.nav-cta{
+  font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;
+  background:var(--yellow);color:var(--black);padding:10px 20px;text-decoration:none;
+}
+
+/* HERO */
+#hero{padding:140px 0 72px;}
+#hero .badge{
+  display:inline-block;background:var(--yellow);color:var(--black);
+  font-size:11px;font-weight:700;letter-spacing:0.20em;text-transform:uppercase;
+  padding:4px 12px;margin-bottom:24px;
+}
+#hero h1{font-size:44px;font-weight:700;letter-spacing:-0.02em;line-height:1.15;margin-bottom:20px;}
+#hero h1 em{font-style:normal;color:var(--yellow);}
+#hero .sub{color:var(--muted);margin-bottom:36px;}
+.hero-meta{
+  display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);
+  border:1px solid var(--border);margin-top:48px;
+}
+.hero-meta div{background:var(--black);padding:16px;}
+.hero-meta .k{font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--subtle);margin-bottom:4px;}
+.hero-meta .v{font-size:13px;font-weight:500;}
+
+/* EVENT CARDS */
+.event-card{
+  background:var(--surface);border:1px solid var(--border);
+  padding:24px;margin-bottom:16px;
+}
+.event-card.featured{background:var(--yellow);color:var(--black);border-color:var(--yellow);}
+.event-date{font-size:32px;font-weight:700;letter-spacing:-0.02em;line-height:1.15;}
+.event-time{font-size:18px;font-weight:700;margin-bottom:12px;}
+.event-detail{font-size:13px;line-height:1.8;}
+.event-card.featured .event-detail{color:rgba(0,0,0,0.75);}
+.event-card:not(.featured) .event-detail{color:var(--muted);}
+.event-tag{
+  display:inline-block;font-size:11px;font-weight:700;letter-spacing:0.20em;
+  text-transform:uppercase;padding:3px 10px;margin-bottom:16px;
+}
+.event-card.featured .event-tag{background:var(--black);color:var(--yellow);}
+.event-card:not(.featured) .event-tag{background:var(--elevated);color:var(--yellow);}
+.event-card .btn{margin-top:20px;}
+.event-card.featured .btn{background:var(--black);color:var(--yellow);}
+.event-price{font-size:18px;font-weight:700;margin-top:12px;}
+.event-price .unit{font-size:12px;font-weight:400;}
+.event-card.soldout{opacity:0.5;}
+.event-card.soldout .btn{background:var(--subtle);color:var(--muted);pointer-events:none;}
+.event-tag.few{background:var(--yellow) !important;color:var(--black) !important;}
+
+/* STATIONS */
+.stations{border:1px solid var(--border);}
+.station{
+  display:flex;align-items:center;gap:16px;
+  padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface);
+}
+.station:last-child{border-bottom:0;}
+.station .num{
+  font-family:'JetBrains Mono',Menlo,monospace;
+  font-size:13px;font-weight:700;color:var(--yellow);min-width:32px;
+}
+.station .name{font-size:15px;font-weight:500;flex:1;}
+.station .sub{font-size:12px;color:var(--muted);}
+.format-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:32px;}
+.format-grid div{background:var(--surface);padding:20px 12px;text-align:center;}
+.format-grid .big{font-size:24px;font-weight:700;color:var(--yellow);display:block;}
+.format-grid .small{font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);}
+
+/* SCHEDULE（週間クラス） */
+.sched-row{
+  display:flex;align-items:baseline;gap:14px;
+  padding:14px 16px;border-bottom:1px solid var(--border);background:var(--surface);
+}
+.sched-row:last-child{border-bottom:0;}
+.sched-days{
+  font-family:'JetBrains Mono',Menlo,monospace;
+  font-size:12px;font-weight:700;color:var(--yellow);min-width:52px;
+}
+.sched-time{font-size:13px;font-weight:700;min-width:100px;white-space:nowrap;}
+.sched-name{font-size:14px;font-weight:500;flex:1;}
+.sched-name .lv{display:block;font-size:11px;color:var(--muted);font-weight:400;}
+#schedule-list{border:1px solid var(--border);}
+
+/* PRICE */
+.price-row{
+  display:flex;justify-content:space-between;align-items:baseline;
+  padding:20px 0;border-bottom:1px solid var(--border);
+}
+.price-row .name{font-weight:500;}
+.price-row .note{font-size:12px;color:var(--muted);display:block;}
+.price-row .amount{font-size:24px;font-weight:700;white-space:nowrap;}
+.price-row .amount .unit{font-size:12px;color:var(--muted);font-weight:400;}
+.price-row.soon .amount{color:var(--subtle);font-size:15px;}
+
+/* STEPS */
+.step{display:flex;gap:20px;margin-bottom:28px;}
+.step .n{
+  font-family:'JetBrains Mono',Menlo,monospace;
+  font-size:13px;font-weight:700;color:var(--black);background:var(--yellow);
+  min-width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+}
+.step h3{font-size:15px;font-weight:700;margin-bottom:4px;}
+.step p{font-size:13px;color:var(--muted);}
+
+/* SPECS */
+.spec-row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.spec-key{color:var(--subtle);letter-spacing:0.06em;text-transform:uppercase;font-size:11px;font-weight:700;padding-top:2px;}
+.spec-val{text-align:right;color:var(--white);}
+.spec-val.y{color:var(--yellow);font-weight:700;}
+
+/* EQUIPMENT (プルダウン) */
+details.equipment{border:1px solid var(--border);background:var(--surface);margin-top:24px;}
+details.equipment summary{
+  cursor:pointer;list-style:none;padding:16px 20px;
+  font-size:13px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--yellow);display:flex;justify-content:space-between;align-items:center;
+}
+details.equipment summary::-webkit-details-marker{display:none;}
+details.equipment summary::after{content:"+";font-size:18px;font-weight:400;transition:transform 150ms ease-out;}
+details.equipment[open] summary::after{content:"−";}
+.equip-row{
+  display:flex;justify-content:space-between;gap:16px;
+  padding:12px 20px;border-top:1px solid var(--border);font-size:13px;
+}
+.equip-row .name{font-weight:500;}
+.equip-row .qty{color:var(--muted);text-align:right;white-space:nowrap;}
+
+/* MEMBERSHIP */
+.plan{
+  background:var(--surface);border:1px solid var(--border);
+  padding:28px 24px;margin-bottom:16px;
+}
+.plan.featured{border-color:var(--yellow);}
+.plan .plan-name{font-size:13px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--yellow);margin-bottom:8px;}
+.plan .plan-price{font-size:36px;font-weight:700;letter-spacing:-0.02em;line-height:1.1;}
+.plan .plan-price .unit{font-size:14px;font-weight:400;color:var(--muted);}
+.plan .plan-note{font-size:13px;color:var(--muted);margin:12px 0 20px;line-height:1.7;}
+.plan .btn{margin-top:4px;}
+
+/* PAYPAY */
+.paypay{
+  background:var(--surface);border:1px solid var(--border);
+  padding:24px;margin-top:24px;text-align:center;
+}
+.paypay img{width:200px;height:200px;object-fit:contain;background:var(--white);padding:10px;margin:0 auto 16px;display:block;}
+.paypay .pp-label{font-size:13px;font-weight:700;color:var(--yellow);letter-spacing:0.08em;margin-bottom:6px;}
+.paypay .pp-note{font-size:12px;color:var(--muted);line-height:1.7;}
+
+/* HERO IMAGE */
+.hero-img{
+  width:100%;aspect-ratio:16/10;object-fit:cover;
+  border:1px solid var(--border);margin-top:36px;display:block;background:var(--surface);
+}
+
+/* GALLERY */
+.gallery{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px;
+}
+.gallery figure{position:relative;margin:0;overflow:hidden;background:var(--surface);border:1px solid var(--border);}
+.gallery img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;transition:transform 300ms ease-out;}
+.gallery figure:hover img{transform:scale(1.04);}
+.gallery figcaption{
+  position:absolute;left:0;right:0;bottom:0;
+  padding:10px 12px;font-size:11px;font-weight:700;letter-spacing:0.08em;
+  color:var(--white);background:linear-gradient(transparent,rgba(0,0,0,0.85));
+}
+.gallery .wide{grid-column:1 / -1;}
+.gallery .wide img{aspect-ratio:16/9;}
+
+/* MAP */
+.map-embed{
+  width:100%;aspect-ratio:16/9;border:1px solid var(--border);
+  margin-bottom:24px;display:block;filter:grayscale(0.3) contrast(1.05);
+}
+.map-link{
+  display:inline-block;font-size:12px;font-weight:700;letter-spacing:0.1em;
+  color:var(--yellow);text-decoration:none;margin-bottom:24px;
+}
+.map-link:hover{text-decoration:underline;}
+
+/* FAQ */
+details.faq{border-bottom:1px solid var(--border);}
+details.faq:first-of-type{border-top:1px solid var(--border);}
+details.faq summary{
+  cursor:pointer;list-style:none;padding:18px 4px;
+  font-size:15px;font-weight:500;
+  display:flex;justify-content:space-between;align-items:center;gap:16px;
+}
+details.faq summary::-webkit-details-marker{display:none;}
+details.faq summary::after{content:"+";font-size:20px;font-weight:400;color:var(--yellow);flex-shrink:0;}
+details.faq[open] summary::after{content:"−";}
+details.faq .a{padding:0 4px 20px;font-size:13px;line-height:1.9;color:var(--muted);}
+
+footer{padding:48px 0 96px;border-top:1px solid var(--border);text-align:center;}
+footer .logo{font-size:18px;font-weight:700;letter-spacing:0.12em;margin-bottom:16px;}
+footer p{font-size:12px;color:var(--subtle);}
+
+/* 固定フッターCTA（モバイル向け） */
+.float-cta{
+  position:fixed;bottom:0;left:0;right:0;z-index:100;
+  display:flex;border-top:1px solid var(--border);
+}
+.float-cta a{flex:1;padding:18px 0;}
+@media(max-width:480px){
+  #hero h1{font-size:34px;}
+  h2{font-size:26px;}
+  .event-date{font-size:26px;}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="#hero">↵ ANIM</a>
+  <a class="nav-cta" href="#book">予約する</a>
+</nav>
+
+<section id="hero">
+  <div class="wrap">
+    <span class="badge">NOW OPEN — 2026.07</span>
+    <h1>下北沢の地下で、<br><em>HYROX</em>を<br>体験する。</h1>
+    <p class="sub">ANIM MOVEMENT CLUB — 世田谷区代沢の地下87㎡。2×10mの人工芝でスレッドプッシュ&プルができる、レースと同じ器具が揃うHYROX特化ジム。</p>
+    <a class="btn btn-primary" href="#events">今週の体験会を見る</a>
+    <img id="hero-img" class="hero-img" alt="ANIM MOVEMENT CLUB 店内" style="display:none;">
+    <a id="ig-follow" class="map-link" style="margin-top:16px;display:none;" href="#" target="_blank" rel="noopener">Instagram @ で最新の空き状況・様子を見る →</a>
+    <div class="hero-meta">
+      <div><div class="k">Location</div><div class="v">池ノ上駅 徒歩30秒 / B1F</div></div>
+      <div><div class="k">Format</div><div class="v">8種目 × 20分サーキット</div></div>
+      <div><div class="k">Level</div><div class="v">初心者OK・ランなし</div></div>
+      <div><div class="k">Capacity</div><div class="v">定員8名 / 回</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="events">
+  <div class="wrap">
+    <hr class="tagline">
+    <p class="label" id="events-label">Events — 開催スケジュール</p>
+    <h2>HYROX体験会</h2>
+
+    <div id="events-list"><!-- CONFIG.events から自動生成 --></div>
+
+    <p style="font-size:12px;color:var(--muted);margin-top:24px;">※ 各回定員8名・先着順。8/6-9 HYROX千葉（幕張メッセ）に出る人のレース対策としても。</p>
+  </div>
+</section>
+
+<section id="schedule">
+  <div class="wrap">
+    <hr class="tagline">
+    <p class="label">Weekly Classes — クラススケジュール</p>
+    <h2>毎日、朝と夜。</h2>
+    <p style="color:var(--muted);margin-bottom:24px;">体験会は上の単発イベント。継続して通う人はこちらの週次クラスへ。予約はDMで日時を送るだけ（前日まで）。</p>
+    <div id="schedule-list"><!-- CONFIG.schedule から自動生成 --></div>
+    <div class="spec-row" style="margin-top:20px;"><span class="spec-key">ドロップイン</span><span class="spec-val y">¥3,300 / 回（サーキット・クラス共通）</span></div>
+    <div class="spec-row"><span class="spec-key">月額会員</span><span class="spec-val">準備中 — 先行案内はDMで</span></div>
+  </div>
+</section>
+
+<section id="format">
+  <div class="wrap">
+    <hr class="tagline">
+    <p class="label">Format</p>
+    <h2>8種目 × 各1分。<br>ランなし、20分で完結。</h2>
+    <div class="format-grid">
+      <div><span class="big">8</span><span class="small">Stations</span></div>
+      <div><span class="big">20<span style="font-size:14px;">min</span></span><span class="small">Circuit</span></div>
+      <div><span class="big">0<span style="font-size:14px;">km</span></span><span class="small">Run</span></div>
+    </div>
+    <div class="stations">
+      <div class="station"><span class="num">01</span><span class="name">SkiErg</span><span class="sub">スキーエルゴ</span></div>
+      <div class="station"><span class="num">02</span><span class="name">Sled Push</span><span class="sub">スレッド押し</span></div>
+      <div class="station"><span class="num">03</span><span class="name">Sled Pull</span><span class="sub">スレッド引き</span></div>
+      <div class="station"><span class="num">04</span><span class="name">Burpee Broad Jump</span><span class="sub">バーピージャンプ</span></div>
+      <div class="station"><span class="num">05</span><span class="name">Row</span><span class="sub">ローイング</span></div>
+      <div class="station"><span class="num">06</span><span class="name">Farmers Carry</span><span class="sub">ケトルベル運搬</span></div>
+      <div class="station"><span class="num">07</span><span class="name">Lunges</span><span class="sub">加重ランジ</span></div>
+      <div class="station"><span class="num">08</span><span class="name">Wall Balls</span><span class="sub">ウォールボール</span></div>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-top:24px;">本番レースと同じ順番・同じ器具。重量と距離は一人ひとりの体力に合わせて調整するので、初心者も経験者も「自分なりの全力」で追い込めます。</p>
+
+    <details class="equipment">
+      <summary>器具一覧を見る</summary>
+      <div class="equip-row"><span class="name">SkiErg</span><span class="qty">×1</span></div>
+      <div class="equip-row"><span class="name">Rowing</span><span class="qty">×1</span></div>
+      <div class="equip-row"><span class="name">Sled Push / Pull</span><span class="qty">人工芝 2×10m</span></div>
+      <div class="equip-row"><span class="name">Kettlebell</span><span class="qty">8 / 12 / 16kg 各2個</span></div>
+      <div class="equip-row"><span class="name">Medicine Ball</span><span class="qty">3 / 5 / 6 / 9kg</span></div>
+      <div class="equip-row"><span class="name">オリンピックバーベル</span><span class="qty">220cm</span></div>
+      <div class="equip-row"><span class="name">ウェイトプレート</span><span class="qty">25 / 15 / 10 / 5kg ×2・20kg ×4</span></div>
+      <div class="equip-row"><span class="name">サンドバッグ</span><span class="qty">20kg ×2（導入予定）</span></div>
+    </details>
+  </div>
+</section>
+
+<section id="space">
+  <div class="wrap">
+    <hr class="tagline">
+    <p class="label">The Space — 施設の様子</p>
+    <h2>地下に、<br>本気の空間。</h2>
+    <div id="gallery" class="gallery"><!-- CONFIG.gallery から自動生成 --></div>
+  </div>
+</section>
+
+<section id="opengym">
+  <div class="wrap">
+    <hr class="tagline">
+    <p class="label">Open Gym</p>
+    <h2>自主練したい人は<br>オープンジムへ。</h2>
+    <p style="color:var(--muted);margin-bottom:24px;">クラスがない時間帯に器具を自由に使える枠。HYROXの種目練習、コンディショニング、なんでも。平日午前を中心に開放中 — 希望日時をDMで送ってください。</p>
+    <div class="spec-row"><span class="spec-key">1時間〜</span><span class="spec-val y">¥2,000 / 人・1h</span></div>
+    <div class="spec-row"><span class="spec-key">1回券</span><span class="spec-val y">¥3,300（最大3時間）</span></div>
+    <div class="spec-row"><span class="spec-key">貸切</span><span class="spec-val y">¥6,000 / 1h</span></div>
+    <div class="spec-row"><span class="spec-key">予約</span><span class="spec-val">DMで日時リクエスト</span></div>
+    <div id="paypay" class="paypay" style="display:none;">
+      <img id="paypay-qr" alt="PayPay QRコード">
+      <p class="pp-label">PayPayで支払う</p>
+      <p class="pp-note" id="paypay-note">QRを読み取って金額を入力してください。<br>支払い後、DMでスクリーンショットを送ると予約確定です。</p>
+    </div>
+  </div>
+</section>
+
+<section id="price">
+  <div class="wrap">
+    <hr class="tagline">
+    <p class="label">Pricing</p>
+    <h2>料金</h2>
+    <div class="price-row">
+      <div class="name">HYROX体験会<span class="note">60分・定員8名・器具レンタル込み</span></div>
+      <div class="amount">¥2,200<span class="unit"> /回</span></div>
+    </div>
+    <div class="price-row">
+      <div class="name">クラス ドロップイン<span class="note">サーキット/クラス共通・都度払い</span></div>
+      <div class="amount">¥3,300<span class="unit"> /回</span></div>
+    </div>
+    <div class="price-row">
+      <div class="name">オープンジム<span class="note">器具自由利用・1時間から</span></div>
+      <div class="amount">¥2,000<span class="unit"> /人・1h〜</span></div>
+    </div>
+    <div class="price-row">
+      <div class="name">オープンジム 1回券<span class="note">器具自由利用・最大3時間</span></div>
+      <div class="amount">¥3,300<span class="unit"> /回</span></div>
+    </div>
+    <div class="price-row">
+      <div class="name">貸切利用<span class="note">スペースまるごと・グループ利用に</span></div>
+      <div class="amount">¥6,000<span class="unit"> /1h</span></div>
+    </div>
+    <div class="price-row soon">
+      <div class="name">月額メンバーシップ<span class="note">全クラス通い放題 — 準備中</span></div>
+      <div class="amount">COMING SOON</div>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-top:20px;">表示は税込。支払いは当日、現金またはPayPay。</p>
+  </div>
+</section>
+
+<section id="membership">
+  <div class="wrap">
+    <hr class="tagline">
+    <p class="label">Membership — 月額会員</p>
+    <h2>通うなら、<br>月額がいちばん。</h2>
+    <div id="membership-list"><!-- CONFIG.membership から自動生成 --></div>
+    <p style="font-size:12px;color:var(--muted);margin-top:16px;">月額はStripeの継続課金。いつでも解約でき、解約手数料はありません。</p>
+  </div>
+</section>
+
+<section id="book">
+  <div class="wrap">
+    <hr class="tagline">
+    <p class="label">How to Book</p>
+    <h2>予約は2ステップ。<br>DM不要、その場で完結。</h2>
+    <div class="step">
+      <div class="n">1</div>
+      <div><h3>予約ページで回を選ぶ</h3><p>「予約・空き状況を見る」から、開催枠と残りの席をその場で確認して選べます。満席の回は自動で締切に。</p></div>
+    </div>
+    <div class="step">
+      <div class="n">2</div>
+      <div><h3>決済して完了</h3><p>カードまたはPayPayで決済すると予約確定。確認・リマインドメールが自動で届きます。日程変更やキャンセルも予約ページから自分でできるので、連絡は不要。当日はシューズ・タオル・飲み物持参で10分前集合。</p></div>
+    </div>
+    <a class="btn btn-primary" id="btn-book-main" href="#events" style="margin-top:32px;">予約・空き状況を見る</a>
+    <p style="font-size:13px;color:var(--muted);margin-top:20px;">オンライン決済が準備中の回と週次クラス・オープンジムは、SNSのDMに希望日時を送れば予約できます（支払いは当日、現金またはPayPay）。</p>
+    <p style="font-size:13px;color:var(--muted);margin-top:28px;">分からないことは下のFAQでほぼ解決します。それでも聞きたいことがあれば：</p>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px;">
+      <a class="btn btn-secondary" id="btn-ig" href="#">Instagramで質問する</a>
+      <a class="btn btn-secondary" id="btn-th" href="#">Threadsで質問する</a>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <hr class="tagline">
+    <p class="label">FAQ — よくある質問</p>
+    <h2>はじめての方へ。</h2>
+    <div id="faq-list"><!-- CONFIG.faq から自動生成 --></div>
+  </div>
+</section>
+
+<section id="access">
+  <div class="wrap">
+    <hr class="tagline">
+    <p class="label">Access</p>
+    <h2>アクセス</h2>
+    <iframe id="map-embed" class="map-embed" style="display:none;" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="ANIM MOVEMENT CLUB 地図"></iframe>
+    <a id="map-link" class="map-link" style="display:none;" href="#" target="_blank" rel="noopener">Googleマップで開く / 経路を調べる →</a>
+    <div class="spec-row"><span class="spec-key">住所</span><span class="spec-val">東京都世田谷区代沢2-42-10 B1F</span></div>
+    <div class="spec-row"><span class="spec-key">最寄駅</span><span class="spec-val">京王井の頭線 池ノ上駅 徒歩30秒<br>下北沢駅 徒歩8分</span></div>
+    <div class="spec-row"><span class="spec-key">目印</span><span class="spec-val">@arvo.corp の地下</span></div>
+    <div class="spec-row"><span class="spec-key">シャワー</span><span class="spec-val">なし</span></div>
+    <div class="spec-row"><span class="spec-key">駐車場</span><span class="spec-val">なし（近隣コインパーキング）</span></div>
+  </div>
+</section>
+
+<footer>
+  <div class="logo">↵ ANIM</div>
+  <p>ANIM MOVEMENT CLUB — HIT THE KEY. BE ANIMAL.</p>
+  <p style="margin-top:8px;">© 2026 ANIM MOVEMENT CLUB</p>
+</footer>
+
+<div class="float-cta">
+  <a class="btn btn-primary" href="#book" style="border:0;">体験会を予約する</a>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════
+   CONFIG — ここだけ書き換えればページ全体に反映される
+   （HTML本文は触らなくてOK。編集ルールは <head> のコメント参照）
+   ════════════════════════════════════════════════ */
+const CONFIG = {
+
+  // ══════ 予約エンジン（STORES予約） ══════
+  //   STORES予約の予約ページURLをここに入れると、ページ上の
+  //   すべての「予約する」ボタン（各回・ナビ・下部固定バー）が
+  //   自動でSTORES予約に飛ぶ。定員・空き状況・リマインドは
+  //   STORES側が管理するので、下の events は「開催予定の見本」表示になる。
+  //   空のままなら従来どおり各回の stripe リンクを使う。
+  booking: {
+    url: "",  // 例: "https://coubic.com/anim..." や STORES予約のURL
+  },
+
+  // SNS・リンク（問い合わせ用。予約はイベントのStripeリンクへ誘導するのが基本）
+  links: {
+    instagram:    "https://ig.me/m/XXXXXXXX",          // ← Instagram DMリンク
+    instagramUrl: "https://www.instagram.com/XXXXXXXX",// ← Instagramプロフィール（フォロー導線）
+    threads:      "https://www.threads.net/@XXXXXXXX", // ← Threadsプロフィール
+    // GoogleマップURL（マップで店名か住所を検索 → 共有 → リンクをコピー）
+    googleMap:    "https://maps.google.com/?q=東京都世田谷区代沢2-42-10",
+    // 地図の埋め込み（Googleマップ → 共有 → 地図を埋め込む → src="..." の中身だけ貼る）
+    mapEmbed:     "",  // 空なら地図は非表示。例: "https://www.google.com/maps/embed?pb=..."
+  },
+
+  // ── 月額会員プラン（空の配列ならセクションごと非表示） ──
+  //   stripe には Stripeの「サブスクリプション」決済リンクを貼る
+  //   （Stripe → 商品を作成 → 継続 → 月額 → 決済リンク発行）
+  membership: [
+    // { name: "MONTHLY", price: 11000, note: "全クラス通い放題・オープンジム込み", stripe: "https://buy.stripe.com/XXXX", featured: true },
+    // { name: "LITE",    price: 6600,  note: "月4回まで・平日限定",             stripe: "https://buy.stripe.com/XXXX" },
+  ],
+
+  // ── PayPay（QR画像を置けば表示。オープンジム・貸切の個別決済用） ──
+  //   images/ に QR画像を置いて paypayQR に "images/paypay.png" を指定
+  paypay: {
+    qr: "",          // 例: "images/paypay-qr.png"（空なら非表示）
+    id: "",          // 例: "@anim-club"（PayPay ID。任意）
+  },
+
+  // ── ヒーロー画像（1枚。空なら非表示） ──
+  //   画像は images/ フォルダに置いて "images/ファイル名" で指定
+  heroImage: "",  // 例: "images/hero.jpg"
+
+  // ── 施設ギャラリー（写真。空の配列なら「施設の様子」セクションごと非表示） ──
+  //   wide:true にすると横幅いっぱいの大きい写真になる
+  gallery: [
+    // { src: "images/space01.jpg", caption: "2×10m 人工芝ゾーン", wide: true },
+    // { src: "images/skierg.jpg",  caption: "SkiErg" },
+    // { src: "images/sled.jpg",    caption: "スレッド" },
+  ],
+
+  // ── 週間クラススケジュール（毎日朝夜・機会損失最小化方針） ──
+  //   days/time/name/level を書き換えるだけ。行を消せば枠も消える。
+  schedule: [
+    { days: "月-土", time: "10:00 – 11:00", name: "HYROXサーキット", level: "初級OK・ランなし・8種目周回" },
+    { days: "月-土", time: "20:30 – 21:30", name: "HYROXクラス",     level: "ラン含む・筋力×持久力の定期クラス" },
+    { days: "日",    time: "10:00 – 11:00", name: "HYROXサーキット", level: "初級OK・ランなし・8種目周回" },
+    { days: "日",    time: "15:00 – 16:00", name: "HYROX体験会",     level: "完全初心者向け・上のイベント枠から予約" },
+    { days: "日",    time: "20:30 – 21:30", name: "HYROXクラス",     level: "ラン含む・筋力×持久力の定期クラス" },
+  ],
+
+  // ── 体験会の日程 ──
+  //   seatsLeft を 0 にすると自動で「満席」表示＆ボタン無効化。
+  //   3以下だと「残り○席」の黄色タグが出る。
+  //   stripe に各回のStripe決済リンクを貼る（在庫数=定員にしておくと安心）。
+  events: [
+    {
+      date: "7/12", dow: "日", time: "15:00 – 16:00",
+      detail: "HYROX8種目を20分に凝縮したサーキット体験。デモ→サーキット→タイム計測チャレンジ。運動不足でも完走できるスケーリング対応。",
+      price: 2200, capacity: 8, seatsLeft: 3,
+      stripe: "https://buy.stripe.com/XXXXXXXX",
+      featured: true,
+    },
+    {
+      date: "7/15", dow: "水", time: "19:30 – 20:30",
+      detail: "仕事帰りに参加できる平日夜の回。内容は日曜と同じ。",
+      price: 2200, capacity: 8, seatsLeft: 8,
+      stripe: "https://buy.stripe.com/XXXXXXXX",
+      featured: false,
+    },
+    {
+      date: "7/19", dow: "日", time: "15:00 – 16:00",
+      detail: "日曜午後の定番枠。友達との参加歓迎。",
+      price: 2200, capacity: 8, seatsLeft: 8,
+      stripe: "https://buy.stripe.com/XXXXXXXX",
+      featured: false,
+    },
+  ],
+
+  // ── FAQ（初めての人の不安を先回りで解消。DMを減らす主役） ──
+  faq: [
+    { q: "運動が苦手でも大丈夫ですか？",
+      a: "大丈夫です。参加者の多くは運動歴ゼロ・体力に自信のない方です。重さも距離も一人ひとりに合わせて調整するので、自分のペースで完走できます。ランはありません。" },
+    { q: "一人で参加しても浮きませんか？",
+      a: "1回8名までの少人数制で、初参加の方が半分以上。スタッフがつきっきりで進めるので、一人参加がむしろ標準です。もちろん友達との参加も歓迎。" },
+    { q: "何を持っていけばいいですか？",
+      a: "室内シューズ・タオル・飲み物の3点だけ。動きやすい服装でお越しください。着替えスペースはあります（シャワーはなし）。" },
+    { q: "シャワーはありますか？",
+      a: "ありません。汗拭きシートの持参がおすすめです。着替えスペースはあるので、着替えて帰れます。" },
+    { q: "支払い方法とキャンセルは？",
+      a: "予約時にこのページからカード決済で完了します（当日精算不要）。キャンセルは前日までなら無料で日程変更、当日キャンセルは返金不可です。" },
+    { q: "入口が分かりません。",
+      a: "@arvo.corp の入る建物の地下（B1F）です。池ノ上駅から徒歩30秒、下北沢駅から徒歩8分。当日迷ったらInstagramのDMへ。" },
+    { q: "体験のあと、勧誘されませんか？",
+      a: "無理な勧誘は一切しません。気に入ったら次回の体験会やオープンジム、月額メンバーシップ（準備中）をご案内する程度です。" },
+    { q: "オープンジム／貸切は使えますか？",
+      a: "はい。オープンジムは1時間¥2,000〜（1回券¥3,300で最大3時間）、スペース貸切は¥6,000/1h。希望日時をDMでご相談ください。" },
+    { q: "サーキットとクラスの違いは？",
+      a: "サーキット（朝10:00）はランなし・8種目を周回する初級〜中級向け。クラス（夜20:30）はランニングも含む通常のHYROXトレーニングで、定期的に通って筋力と持久力を作る人向けです。どちらもドロップイン¥3,300で単発参加できます。" },
+  ],
+};
+
+/* ── 以下は描画ロジック。基本さわらない ── */
+(function () {
+  const yen = n => "¥" + n.toLocaleString("ja-JP");
+  // "XXXX" を含むURLは未設定扱い（プレースホルダーを踏ませない）
+  const real = u => !!u && u.indexOf("XXXX") === -1;
+
+  // STORES予約が設定されているか（予約エンジンとして最優先で使う）
+  const STORE = (CONFIG.booking && real(CONFIG.booking.url)) ? CONFIG.booking.url : "";
+
+  // 週間クラススケジュール
+  const sched = document.getElementById("schedule-list");
+  if (CONFIG.schedule && CONFIG.schedule.length) {
+    sched.innerHTML = CONFIG.schedule.map(s => `
+      <div class="sched-row">
+        <span class="sched-days">${s.days}</span>
+        <span class="sched-time">${s.time}</span>
+        <span class="sched-name">${s.name}<span class="lv">${s.level || ""}</span></span>
+      </div>`).join("");
+  } else {
+    document.getElementById("schedule").style.display = "none";
+  }
+
+  // イベントカード生成
+  const list = document.getElementById("events-list");
+  list.innerHTML = CONFIG.events.map(ev => {
+    // STORESモードでは定員・空きはSTORES側が真実なので、席数はカードに出さない
+    const sold = !STORE && ev.seatsLeft <= 0;
+    const few  = !STORE && !sold && ev.seatsLeft <= 3;
+    let tag;
+    if (sold)             tag = "満席";
+    else if (ev.featured) tag = few ? "Next — 残り" + ev.seatsLeft + "席" : "Next";
+    else                  tag = few ? "残り" + ev.seatsLeft + "席" : "受付中";
+    const cls = "event-card" + (ev.featured ? " featured" : "") + (sold ? " soldout" : "");
+    const btnCls = "btn" + (ev.featured ? "" : " btn-secondary");
+    const btnLabel = sold ? "満席" : "この回を予約する";
+    // 予約先：STORESがあれば全てSTORESへ、なければ各回のStripeリンク。
+    // どちらも未設定なら予約手順セクション（DM案内）へフォールバック
+    const dest = STORE || (real(ev.stripe) ? ev.stripe : "");
+    const href = sold ? "#" : (dest || "#book");
+    const targetAttr = (!sold && dest) ? ' target="_blank" rel="noopener"' : "";
+    return `
+      <div class="${cls}">
+        <span class="event-tag${few ? " few" : ""}">${tag}</span>
+        <p class="event-date">${ev.date} <span style="font-size:18px;">(${ev.dow})</span></p>
+        <p class="event-time">${ev.time}</p>
+        <p class="event-detail">${ev.detail}</p>
+        <p class="event-price">${yen(ev.price)}<span class="unit"> /人・定員${ev.capacity}名</span></p>
+        <a class="${btnCls}" href="${href}"${targetAttr}>${btnLabel}</a>
+      </div>`;
+  }).join("");
+
+  // STORESモードなら、ナビ・下部固定バー・見出し・メイン予約ボタンを予約ページへ直結
+  if (STORE) {
+    document.querySelectorAll('.nav-cta, .float-cta a, #btn-book-main').forEach(a => {
+      a.href = STORE; a.target = "_blank"; a.rel = "noopener";
+    });
+    const lbl = document.getElementById("events-label");
+    if (lbl) lbl.textContent = "Events — 開催スケジュール（空き状況は予約ページで）";
+  }
+
+  // FAQ生成
+  const faq = document.getElementById("faq-list");
+  faq.innerHTML = CONFIG.faq.map(item => `
+    <details class="faq">
+      <summary>${item.q}</summary>
+      <div class="a">${item.a}</div>
+    </details>`).join("");
+
+  // SNSボタン（URL未設定のうちは非表示にしてリンク切れを防ぐ）
+  [["btn-ig", CONFIG.links.instagram], ["btn-th", CONFIG.links.threads]].forEach(([id, url]) => {
+    const b = document.getElementById(id);
+    if (real(url)) b.href = url; else b.style.display = "none";
+  });
+
+  // ヒーロー画像
+  if (CONFIG.heroImage) {
+    const hi = document.getElementById("hero-img");
+    hi.src = CONFIG.heroImage;
+    hi.style.display = "block";
+  }
+
+  // Instagramフォロー導線（ヒーロー下）
+  if (real(CONFIG.links.instagramUrl)) {
+    const igf = document.getElementById("ig-follow");
+    igf.href = CONFIG.links.instagramUrl;
+    igf.style.display = "inline-block";
+  }
+
+  // ギャラリー（写真がなければセクションごと隠す）
+  const gal = document.getElementById("gallery");
+  if (CONFIG.gallery && CONFIG.gallery.length) {
+    gal.innerHTML = CONFIG.gallery.map(p => `
+      <figure class="${p.wide ? "wide" : ""}">
+        <img src="${p.src}" alt="${p.caption || ""}" loading="lazy">
+        ${p.caption ? `<figcaption>${p.caption}</figcaption>` : ""}
+      </figure>`).join("");
+  } else {
+    document.getElementById("space").style.display = "none";
+  }
+
+  // 月額会員（プランがなければセクションごと隠す）
+  const mem = document.getElementById("membership-list");
+  if (CONFIG.membership && CONFIG.membership.length) {
+    mem.innerHTML = CONFIG.membership.map(p => {
+      const ready = p.stripe && p.stripe.indexOf("XXXX") === -1;
+      const btn = ready
+        ? `<a class="btn btn-primary" href="${p.stripe}" target="_blank" rel="noopener">この会員になる</a>`
+        : `<a class="btn btn-secondary" href="#" style="pointer-events:none;opacity:.5;">準備中</a>`;
+      return `
+        <div class="plan${p.featured ? " featured" : ""}">
+          <p class="plan-name">${p.name}</p>
+          <p class="plan-price">${yen(p.price)}<span class="unit"> /月（税込）</span></p>
+          <p class="plan-note">${p.note || ""}</p>
+          ${btn}
+        </div>`;
+    }).join("");
+  } else {
+    document.getElementById("membership").style.display = "none";
+  }
+
+  // PayPay QR
+  if (CONFIG.paypay && CONFIG.paypay.qr) {
+    document.getElementById("paypay-qr").src = CONFIG.paypay.qr;
+    if (CONFIG.paypay.id) {
+      document.getElementById("paypay-note").innerHTML =
+        `PayPay ID: <b>${CONFIG.paypay.id}</b><br>支払い後、DMでスクリーンショットを送ると予約確定です。`;
+    }
+    document.getElementById("paypay").style.display = "block";
+  }
+
+  // 地図
+  if (CONFIG.links.mapEmbed) {
+    const m = document.getElementById("map-embed");
+    m.src = CONFIG.links.mapEmbed;
+    m.style.display = "block";
+  }
+  if (CONFIG.links.googleMap && CONFIG.links.googleMap.indexOf("XXXX") === -1) {
+    const ml = document.getElementById("map-link");
+    ml.href = CONFIG.links.googleMap;
+    ml.style.display = "inline-block";
+  }
+})();
+</script>
+
+</body>
+</html>
