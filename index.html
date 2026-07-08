@@ -421,11 +421,11 @@ footer p{font-size:12px;color:var(--subtle);}
       <div class="name">貸切利用<span class="note">スペースまるごと・グループ利用に</span></div>
       <div class="amount">¥6,000<span class="unit"> /1h</span></div>
     </div>
-    <div class="price-row soon">
-      <div class="name">月額メンバーシップ<span class="note">全クラス通い放題 — 準備中</span></div>
-      <div class="amount">COMING SOON</div>
+    <div class="price-row">
+      <div class="name">月額メンバーシップ<span class="note">月4回〜通い放題まで4プラン。詳細は下のMembershipへ</span></div>
+      <div class="amount">¥11,800〜</div>
     </div>
-    <p style="font-size:12px;color:var(--muted);margin-top:20px;">表示は税込。支払いは当日、現金またはPayPay。</p>
+    <p style="font-size:12px;color:var(--muted);margin-top:20px;">表示は税込。単発メニューの支払いは当日、現金またはPayPay。月額会員はStripeの継続課金。</p>
   </div>
 </section>
 
@@ -528,8 +528,10 @@ const CONFIG = {
   //   stripe には Stripeの「サブスクリプション」決済リンクを貼る
   //   （Stripe → 商品を作成 → 継続 → 月額 → 決済リンク発行）
   membership: [
-    // { name: "MONTHLY", price: 11000, note: "全クラス通い放題・オープンジム込み", stripe: "https://buy.stripe.com/XXXX", featured: true },
-    // { name: "LITE",    price: 6600,  note: "月4回まで・平日限定",             stripe: "https://buy.stripe.com/XXXX" },
+    { name: "ライト",     price: 11800, note: "月4回まで・サーキット/クラス自由選択（オープンジムは別料金）", stripe: "https://buy.stripe.com/XXXX" },
+    { name: "ベーシック", price: 20800, note: "月8回まで・サーキット/クラス+オープンジム使い放題込み",       stripe: "https://buy.stripe.com/XXXX" },
+    { name: "レギュラー", price: 27600, note: "月12回まで・サーキット/クラス+オープンジム使い放題込み",      stripe: "https://buy.stripe.com/XXXX" },
+    { name: "Unlimited",  price: 30800, note: "毎日通っても定額。全クラス+オープンジム使い放題",             stripe: "https://buy.stripe.com/XXXX", featured: true },
   ],
 
   // ── PayPay（QR画像を置けば表示。オープンジム・貸切の個別決済用） ──
