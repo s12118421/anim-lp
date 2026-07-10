@@ -559,7 +559,7 @@ const CONFIG = {
     { days: "月-土", time: "10:00 – 11:00", name: "HYROXサーキット", level: "初級OK・ランなし・8種目周回" },
     { days: "月-土", time: "20:30 – 21:30", name: "HYROXクラス",     level: "ラン含む・筋力×持久力の定期クラス" },
     { days: "日",    time: "10:00 – 11:00", name: "HYROXサーキット", level: "初級OK・ランなし・8種目周回" },
-    { days: "日",    time: "15:00 – 16:00", name: "HYROX体験会",     level: "完全初心者向け・上のイベント枠から予約" },
+    { days: "土・日", time: "16:00 – 17:00", name: "HYROX体験会",     level: "完全初心者向け・上のイベント枠から予約" },
     { days: "日",    time: "20:30 – 21:30", name: "HYROXクラス",     level: "ラン含む・筋力×持久力の定期クラス" },
   ],
 
@@ -569,21 +569,21 @@ const CONFIG = {
   //   stripe に各回のStripe決済リンクを貼る（在庫数=定員にしておくと安心）。
   events: [
     {
-      date: "7/12", dow: "日", time: "15:00 – 16:00",
+      date: "7/12", dow: "日", time: "16:00 – 17:00",
       detail: "HYROX8種目を20分に凝縮したサーキット体験。デモ→サーキット→タイム計測チャレンジ。運動不足でも完走できるスケーリング対応。",
       price: 3000, capacity: 8, seatsLeft: 3,
       stripe: "https://buy.stripe.com/XXXXXXXX",
       featured: true,
     },
     {
-      date: "7/15", dow: "水", time: "19:30 – 20:30",
-      detail: "仕事帰りに参加できる平日夜の回。内容は日曜と同じ。",
+      date: "7/18", dow: "土", time: "16:00 – 17:00",
+      detail: "土曜夕方の回。内容は日曜と同じ。",
       price: 3000, capacity: 8, seatsLeft: 8,
       stripe: "https://buy.stripe.com/XXXXXXXX",
       featured: false,
     },
     {
-      date: "7/19", dow: "日", time: "15:00 – 16:00",
+      date: "7/19", dow: "日", time: "16:00 – 17:00",
       detail: "日曜午後の定番枠。友達との参加歓迎。",
       price: 3000, capacity: 8, seatsLeft: 8,
       stripe: "https://buy.stripe.com/XXXXXXXX",
