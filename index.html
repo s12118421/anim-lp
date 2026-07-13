@@ -326,10 +326,11 @@ footer p{font-size:12px;color:var(--subtle);}
     <hr class="tagline">
     <p class="label">Weekly Classes — クラススケジュール</p>
     <h2>毎日、朝と夜。</h2>
-    <p style="color:var(--muted);margin-bottom:24px;">体験会は上の単発イベント。継続して通う人はこちらの週次クラスへ。予約はDMで日時を送るだけ（前日まで）。</p>
+    <p style="color:var(--muted);margin-bottom:24px;">体験会は上の単発イベント。継続して通う人はこちらの週次クラスへ。下のボタンから都度払いでその場予約できます（DM不要）。</p>
     <div id="schedule-list"><!-- CONFIG.schedule から自動生成 --></div>
     <div class="spec-row" style="margin-top:20px;"><span class="spec-key">ドロップイン</span><span class="spec-val y">¥5,000 / 回（サーキット・クラス共通）</span></div>
     <div class="spec-row"><span class="spec-key">月額会員</span><span class="spec-val">¥14,000〜 — 下のMembershipへ</span></div>
+    <a id="btn-dropin" class="btn btn-primary" href="#book" style="margin-top:20px;">クラスをドロップインで予約する</a>
   </div>
 </section>
 
@@ -525,6 +526,15 @@ const CONFIG = {
     mapEmbed:     "",  // 空なら地図は非表示。例: "https://www.google.com/maps/embed?pb=..."
   },
 
+  // ── クラスのドロップイン決済（週次サーキット/クラス共通・都度払い） ──
+  //   ここにStripeの決済リンクを貼ると、週間スケジュール下の
+  //   「クラスをドロップインで予約する」ボタンが直接Stripe決済に飛ぶ。
+  //   空のままだとDM予約(#book)にフォールバックする。
+  dropIn: {
+    price: 5000,
+    stripe: "https://buy.stripe.com/XXXX", // 例: Stripeで「クラスドロップイン ¥5,000」の単発決済リンクを作成して貼る
+  },
+
   // ── 月額会員プラン（空の配列ならセクションごと非表示） ──
   //   stripe には Stripeの「サブスクリプション」決済リンクを貼る
   //   （Stripe → 商品を作成 → 継続 → 月額 → 決済リンク発行）
@@ -633,6 +643,17 @@ const CONFIG = {
       </div>`).join("");
   } else {
     document.getElementById("schedule").style.display = "none";
+  }
+
+  // ドロップイン予約ボタン（Stripe未設定ならDM予約セクションへフォールバック）
+  const dropinBtn = document.getElementById("btn-dropin");
+  if (dropinBtn) {
+    const dropinUrl = STORE || (CONFIG.dropIn && real(CONFIG.dropIn.stripe) ? CONFIG.dropIn.stripe : "");
+    if (dropinUrl) {
+      dropinBtn.href = dropinUrl;
+      dropinBtn.target = "_blank";
+      dropinBtn.rel = "noopener";
+    }
   }
 
   // イベントカード生成
